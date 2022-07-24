@@ -79,6 +79,15 @@ prove_rb(A,Rulebase,P0,P):-
     find_clause((A:-B),Rule,Rulebase),
 	prove_rb(B,Rulebase,[p(A,Rule)|P0],P).
 
+prove_rb(not(A),Rulebase,P0,P):-
+    find_clause((B:-A),Rule,Rulebase),
+	prove_rb(not(B),Rulebase,[p(not(A),Rule)|P0],P).
+
+prove_rb(A,Rulebase,P0,P):-
+    (find_clause((A;B:-C),Rule,Rulebase);
+	find_clause((B;A:-C),Rule,Rulebase)),
+	prove_rb((C,not(B)),Rulebase,[p(A,Rule)|P0],P).
+
 % top-level version that ignores proof
 prove_rb(Q,RB):-
 	prove_rb(Q,RB,[],_P).
@@ -120,5 +129,3 @@ all_answers(PN,Answer):-
 	( Messages=[] -> atomic_list_concat(['I know nothing about',PN],' ',Answer)
 	; otherwise -> atomic_list_concat(Messages,". ",Answer)
 	).
-
-

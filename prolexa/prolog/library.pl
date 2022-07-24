@@ -112,6 +112,12 @@ conj_remove_one(X,(X,Ys),Ys).
 conj_remove_one(X,(Y,Ys),(Y,Zs)):-
 	conj_remove_one(X,Ys,Zs).
 
+disj_remove_one(X,X,false):-	% single-element disjunction
+	not X=false,
+	not X=(One,TheOther).
+disj_remove_one(X,(X;Ys),Ys).
+disj_remove_one(X,(Y;Ys),(Y;Zs)):-
+	disj_remove_one(X,Ys,Zs).
 
 %%% Preventing variables from getting instantiated.
 

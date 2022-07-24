@@ -18,15 +18,22 @@ iverb(p,M)			--> [Verb],   {pred2gr(_P,1,v/Verb,M)}.
 % unary predicates for adjectives, nouns and verbs
 pred(human,   1,[a/human,n/human]).
 pred(mortal,  1,[a/mortal,n/mortal]).
+
+pred(happy,  1,[a/happy]).
+pred(red,  1,[a/red]).
+pred(green,  1,[a/green]).
+pred(blue,  1,[a/blue]).
 %pred(man,     1,[a/male,n/man]).
 %pred(woman,   1,[a/female,n/woman]).
 %pred(married, 1,[a/married]).
 %pred(bachelor,1,[n/bachelor]).
 %pred(mammal,  1,[n/mammal]).
 pred(bird,    1,[n/bird]).
+pred(pixel,    1,[n/pixel]).
 %pred(bat,     1,[n/bat]).
 pred(penguin, 1,[n/penguin]).
 pred(sparrow, 1,[n/sparrow]).
+pred(teacher,    1,[n/teacher]).
 pred(fly,     1,[v/fly]).
 
 pred2gr(P,1,C/W,X=>Lit):-
@@ -53,9 +60,34 @@ sentence(C) --> sword,sentence1(C).
 sword --> [].
 sword --> [that]. 
 
+
+
 % most of this follows Simply Logical, Chapter 7
-sentence1(C) --> determiner(N,M1,M2,C),noun(N,M1),verb_phrase(N,M2).
+%sentence1(C) --> determiner(N,M1,M2,C),noun(N,M1),verb_phrase(N,M2).
+sentence1([((H1;H2):-B)]) --> determiner(N,M1=>B,M2=>H1,[(H1:-B)]),noun(N,M1=>B),verb_phrase(N,M2=>H1),property_or_list(N,(M2=>H2)).
+sentence1([((H1,H2):-B)]) --> determiner(N,M1=>B,M2=>H1,[(H1:-B)]),noun(N,M1=>B),verb_phrase(N,M2=>H1),property_and_list(N,(M2=>H2)).
+%need to figure out a way to write a recurision for determiner
+
+sentence1([(H:-B)]) --> determiner(N,M1=>B,M2=>H,[(H:-B)]),noun(N,M1=>B),verb_phrase(N,M2=>H).
+
+sentence1([(not(H):-B)]) --> determiner(N,M1=>B,M2=>H,[(H:-B)]),noun(N,M1=>B),not_verb_phrase(N,M2=>H).
+
 sentence1([(L:-true)]) --> proper_noun(N,X),verb_phrase(N,X=>L).
+
+sentence1([(not(L):-true)]) --> proper_noun(N,X),not_verb_phrase(N,X=>L).
+
+sentence1([((H1;H2):-true)]) --> proper_noun(N,X),verb_phrase(N,X=>H1),property_or_list(N,(X=>H2)).
+sentence1([((H1,H2):-true)]) --> proper_noun(N,X),verb_phrase(N,X=>H1),property_and_list(N,(X=>H2)).
+
+property_or_list(N,X=>M) --> [or],property(N,X=>M).
+property_or_list(N,X=>(M1;M2)) --> [or],property(N,X=>M1), property_or_list(N,X=>M2).
+property_and_list(N,X=>M) --> [and],property(N,X=>M).
+property_and_list(N,X=>(M1,M2)) --> [and],property(N,X=>M1), property_and_list(N,X=>M2).
+
+not_verb_phrase(s,M) --> [is, not],property(s,M).
+not_verb_phrase(p,M) --> [are, not],property(p,M).
+not_verb_phrase(s,M) --> [does, not],iverb(p,M).
+not_verb_phrase(p,M) --> [do, not],iverb(p,M).
 
 verb_phrase(s,M) --> [is],property(s,M).
 verb_phrase(p,M) --> [are],property(p,M).
@@ -67,12 +99,13 @@ property(p,M) --> noun(p,M).
 
 determiner(s,X=>B,X=>H,[(H:-B)]) --> [every].
 determiner(p,X=>B,X=>H,[(H:-B)]) --> [all].
-%determiner(p,X=>B,X=>H,[(H:-B)]) --> [].
+determiner(p,X=>B,X=>H,[(H:-B)]) --> [].
 %determiner(p, sk=>H1, sk=>H2, [(H1:-true),(H2 :- true)]) -->[some].
 
 proper_noun(s,tweety) --> [tweety].
 proper_noun(s,peter) --> [peter].
-
+proper_noun(s,donald) --> [donald].
+proper_noun(s,pixie) --> [pixie].
 
 %%% questions %%%
 
