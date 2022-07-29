@@ -94,7 +94,6 @@ prove_rb(Q,RB):-
 
 
 %%% Utilities from nl_shell.pl %%%
-
 find_clause(Clause,Rule,[Rule|_Rules]):-
 	copy_term(Rule,[Clause]).	% do not instantiate Rule
 find_clause(Clause,Rule,[_Rule|Rules]):-

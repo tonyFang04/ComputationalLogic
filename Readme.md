@@ -1,222 +1,265 @@
-# Computational Logical Coursework Report
+# Computational Logic Coursework Report By Tony Fang
 
-Tony Fang
+### Author [Tony Fang](https://github.com/tonyFang04) 
 
-### Negation
+This is the report for the coursework of Computational Logic.
 
-First goal of this assignment is to handle negation such as the following example.
+All code can be found at this [repo](https://github.com/tonyFang04/ComputationalLogic)
 
-> Every teacher is happy. 
-> Donald is not happy. 
-> Therefore, Donald is not a teacher.
+### Contents
 
-To do this, first I editted the ```proloxa_grammer.pl``` file. I added "donald" as a proper noun and "happy" as an adjective. This is achieved by adding the two following lines to ```proloxa_grammer.pl```.
+1. [Introduction to Prolexa](#motivation)
+   1. [My Objectives](#objectives)
+2. [Determine Prolexa source code Locations that needs to be extended](#method)
+3. [Adding Clauses to ```sentence1/3``` and ```prove_rb/4```](#implementation)
+   1. [Objectives 1, 2 and 3: Negation](#negation)
+   2. [Objectives 4, 5 and 6: Conjunction](#conjunction)
+   3. [Objectives 7, 8 and 9: Disjunction](#disjunction)
+4. [Conclusion](#limitations)
 
+
+# <a name="motivation">Introduction to Prolexa followed by My Objectives #
+   [Prolexa](https://github.com/simply-logical/ComputationalLogic/tree/prolexa-plus) is a simple question-answering assistant written in Prolog. It can be run on the command line, in Google Colab, or integrated with Alexa. For details on how to run Prolexa, please go to repo [https://github.com/simply-logical/ComputationalLogic/tree/prolexa-plus
+](https://github.com/simply-logical/ComputationalLogic/tree/prolexa-plus
+).
+   
+   At runtime, the assistant takes in an utterence as input, processes the utterence, then wait for the next utterence. The assistant processes the utterence in one of the 4 following ways:
+   
+   - A: it checks whether the utterence coressponds to a statement. If so, it will convert the utterence into a Prolog rule. It will then attempt to infer this rule from all the stored rules in its rule base. If the inference process is successful, it will output "I already know \<utterence\>". If the inference process fails, it will output "I will remember that \<utterence\>". For example, if the assistant takes in an utterence "peter is happy", it will first convert this utterence to \[(happy(peter):-true)\], which is the corresponding Prolog rule to "peter is happy". It will then query whether \[(happy(peter):-true)\] can be successfully inferred from its rule base. If the query is successful, it will output "I already know peter is happy". If the query is not successful, it will output "I will remember that peter is happy".
+   - B: it checks whether the utterence corresponds to a question and attempts to answer the question.
+   - C: it checks whether the utterence corresponds to a command. If so, it will execute the command and output a corresponding message. For example, if the assistant receives utterence "explain why \<statement\>", it will attempt to infer the rule corresponding to the \<statement\>. If this rule can successfully be inferred, it will output a message that containts the steps of the inference process. For example, if the rule base contains rules corresponding to "peter is human" and "every human is mortal", then the utterence "explain why peter is mortal" will result in an output message of "peter is human. every human is mortal. therefore peter is mortal". If the inference process fails, it will simply output "Sorry, I don't think this is the case".
+   - D: if an utterence cannot be processed following the steps in A, B, or C, the assistant will simply output "I heard you say, \<utterence\>, could you rephrase that please?
+   
+   However, Prolexa can only process utterences that do not contain word "not", "and", and "or". This means that Prolexa cannot handle utterences that contains negation, conjunction and disjunction. Therefore, my goal for this coursework is to extend Prolexa such that it can process utterences containing negation, conjunction and disjunction. 
+   
+   ## <a name="objectives">My Objectives #
+   
+   My objectives for this coursework is to extend Prolexa such that:
+   
+   1. utterence "peter is not happy" can be converted to rule \[(not(happy(peter)):-true)\].
+   2. utterence "every teacher is not happy" can be converted to rule \[(not(happy(X)):-teacher(X))\].
+   3. given the rule base contains rules corresponding to "peter is not happy" and "every teacher is happy", Prolexa can infer utterence "peter is not a teacher".
+   4. utterence "peter is happy and mortal and red" can be converted to rule \[(happy(peter),mortal(peter),red(peter)):-true)\].
+   5. utterence "every human is happy and mortal and red" can be converted to rule \[(happy(X),mortal(X),red(X)):-human(X))\].
+   6.  given the rule base contains rules corresponding to "peter is human", "every human is happy", "every human is mortal", "every human is red", it can infer utterence "peter is happy and mortal and red".
+   7. utterence "peter is happy or mortal or red" can be converted to rule \[(happy(peter);mortal(peter);red(peter)):-true)\].
+   8. utterence "every human is happy or mortal or red" can be converted to rule \[(happy(X);mortal(X);red(X)):-human(X))\].
+   9. given the rule base contains rules corresponding to "peter is human", "every human is happy or mortal", "peter is not happy", it can infer utterence "peter is mortal".
+
+   
+# <a name="method">Determine Prolexa source code Locations that needs to be extended #
+   
+   To achieve the objectives listed in the previous section, I need to determine where in the source code that I need to add more clauses. This means I need to find out what sections of the Prolexa source code converts statements/sentences into rules, and what sections handles the inference. To achieve this, I first cloned the [Prolexa repo](https://github.com/simply-logical/ComputationalLogic/tree/prolexa-plus) to my own device locally. I then started investigating the .pl files in the ```prolexa/prolog``` directory by inspecting the files by eyes, testing certain rules out of interest by running queries on the command line and using the swipl graphical debugger.
+   
+   I started my inspection from ```prolexa.pl``` because running ```swipl prolexa.pl``` starts Prolexa. Line 1 in ```prolexa.pl``` suggested that ```prolexa_cli``` is the command that starts the question-answering in Prolexa. The body of rule ```prolexa_cli/1``` reads the input utterence from comand line, then calls rule ```handle_utterence/3```, which processes the input utterence then outputs a message.
+   
+   ```handle_utterence/3``` first tokenizes the input utterence to a list of words. It then determines whether the utterence can be processed in 1 of the 4 ways described in [Motivation](#motivation). To determine whether the utterence corresponds to a statement (or a sentence that is not a question), a question, a command or none of the 3. This is achieved by calling  rule ```sentence/3```, ```question/3```, ```command/3``` from  ```prolexa_grammer.pl``` respectively. 
+   
+   However, out of the 3 rules only ```sentence/3``` is responsible for converting tokenized utterences into Prolog rules whilst the actual convertion in ```sentence1/3``` is handled entirely by ```sentence1/3```. ```question/3``` only converts utterences into facts to be queried and ```command/3``` calls ```sentence/3``` and ```sentence1/3``` to convert sentences to rules. For example, querying ```sentence/3``` and ```question/3``` produces the following results:
+   
+   ```
+   3 ?- sentence(A,[every,human,is,mortal],[]).
+   A = [(mortal(_A):-human(_A))] .
+
+   2 ?- question(A,[who,is,mortal],[]). 
+   A = mortal(_) .
+   ```
+   
+   whilst Line 136 and 140 in ```prolexa_grammer.pl``` showed rule ```command/3``` calling ```sentence/3``` and ```sentence1/3```
+   
+   ```
+   command(g(retractall(prolexa:stored_rule(_,C)),"I erased it from my memory")) --> forget,sentence(C). 
+   command(g(explain_question(Q,_,Answer),Answer)) --> [explain,why],sentence1([(Q:-true)]).
+   ```
+   
+   Therefore, in order to achieve objectives 1, 2, 4, 5, 7 and 8, I only need to add more clauses to rule ```sentence1/3```.
+   
+   After ```sentence/3``` is called in ```prolexa.pl```, it then calls ```known_rule/2``` in ```prolexa_engine.pl```. ```known_rule/2``` then calls ```prove_rb/2``` which then calls ```prove_rb/4```. ```prove_rb/4``` is a meta-interpreter that functions exactly the same as the following meta-interpreter found in Simply Logical Chpater 3.8:
+   
 ```
-proper_noun(s,donald) --> [donald].
-pred(happy,  1,[a/happy]).
-pred(teacher,    1,[n/teacher]).
+prove_p(true,[]):-!.
+prove_p((A,B),[p((A,B),(A:-C))|Proof]):-!,
+    clause(A,C),
+    conj_append(C,B,D),
+    prove_p(D,Proof).
+prove_p(A,[p(A,(A:-B))|Proof]):-
+    clause(A,B),
+    prove_p(B,Proof).
 ```
-
-Now prolexa can interpret utterance "donald is happy".
-
+   
+   The only differences between the two is that ```prove_rb/4``` has an accumulator and checks the rules stored in the dynamic rulebase constructed at runtime rather than the static rules in the files. 
+   
+   By using the swipl graphical debugger, I confirmed that ```prove_rb/4``` is indeed the meta-interpreter that handles the inference processes in Prolexa after sentences/statements are converted into rules. Therefore, to achieve objectives 3, 6 and 9 I only need to add more clauses to ```prove_rb/4```.
+   
+# <a name="implementation">Adding Clauses to ```sentence1/3``` and ```prove_rb/4``` #
+   Since it has been established in the previous section that Prolexa can already tokenize input sentences, Objective 1-9 can simply be reduced to the following:
+   
+   1. utterence list [peter, is, not, happy] can be converted to rule \[(not(happy(peter)):-true)\].
+   2. utterence list [every, teacher, is, not, happy] can be converted to rule \[(not(happy(X)):-not(teacher(X)))\].
+   3. given the rule base contains rules corresponding to "peter is not happy" and "every teacher is happy", Prolexa can infer utterence "peter is not a teacher".
+   4. utterence list [peter, is, happy, and, mortal, and, red] can be converted to rule \[(happy(peter),mortal(peter),red(peter)):-true)\].
+   5. utterence list [every, human, is, happy, and, mortal, and, red] can be converted to rule \[(happy(X),mortal(X),red(X)):-human(X))\].
+   6.  given the rule base contains rules corresponding to "peter is human", "every human is happy", "every human is mortal", "every human is red", it can infer utterence "peter is happy and mortal and red".
+   7. utterence list [peter, is, happy, or, mortal, or, red] can be converted to rule \[(happy(peter);mortal(peter);red(peter)):-true)\].
+   8. utterence list [every, human, is, happy, or, mortal, or, red] can be converted to rule \[(happy(X);mortal(X);red(X)):-human(X))\].
+   9. given the rule base contains rules corresponding to "peter is human", "every human is happy or mortal", "peter is not happy", it can infer utterence "peter is mortal".
+   
+## Objectives 1, 2 and 3: Negation <a name="negation">
+   
+   ### Objective 1
+   
+   To achieve objective 1, the following queries should be successful when running ```swipl prolexa_grammer.pl```:
+   
 ```
-prolexa> "donald is happy".
-*** utterance(donald is happy)
-*** rule([(happy(donald):-true)])
-*** answer(I will remember that donald is happy)
-I will remember that donald is happy
+1 ?- sentence1(A,[peter,is,not,happy],[]).                           
+A = [(not(happy(peter)):-true)] .
+2 ?- sentence1(A,[tweety,does,not,fly],[]).    
+A = [(not(fly(tweety)):-true)] .
 ```
-
-From the example above, we can see that prolexa takes "donald is happy" as input and convert that sentence into a rule ```[(happy(donald):-true)]```. This suggests that if I want prolexa to interpret "donald is not happy", prolexa need to convert that into a coressponding predicate form that expresses "donald is not happy". The following predicate forms are all potential choices:
-
-```
-[(not(happy(donald)):-true)]
-[(happy(donald):-false)]
-[:-(happy(donald))]
-```
-
-For the sake of making minimal changes to the code later on, ```[(not(happy(donald)):-true)]``` was chosen as the corresponding predicate form for expression "donald is not happy".
-
-Inspections on ```prolexa.pl``` made me realise that the utterances and rules are converted back and forth from each other using the "sentence/3" predicate in ```proloxa_grammer.pl```. So the goal is to get the "sentence/3" predicate to handle query ```?-sentence([(not(happy(donald)):-true)],[donald, is, not, happy], [])```. This is achieved by adding
-
+   
+   This is achieved by adding the following clauses to ```prolexa_grammer.pl```:
+   
 ```
 sentence1([(not(L):-true)]) --> proper_noun(N,X),not_verb_phrase(N,X=>L).
 not_verb_phrase(s,M) --> [is, not],property(s,M).
 not_verb_phrase(p,M) --> [are, not],property(p,M).
-```
-
-to ```proloxa_grammer.pl```. Now query ```?-sentence([(not(happy(donald)):-true)],[donald, is, not, happy], []).``` returns ```true```. The ```proloxa_grammer.pl``` should not only be able to interpret the present tense single and plural of "be" verbs, but also handle the present tense single and plural of the rest of the verbs such that it can handle "tweety does not fly". This requires two addition lines of code into ```proloxa_grammer.pl```:
-
-```
 not_verb_phrase(s,M) --> [does, not],iverb(p,M).
 not_verb_phrase(p,M) --> [do, not],iverb(p,M).
 ```
-
-Notice that the only difference between these two lines is the input of the first argument in predicate ```not_verb_phrase/4```. The "s" stands for "single" and the "p" stands for "plural". Now query ```?-sentence([(not(fly(tweety)):-true)],[tweety, does, not, fly], []).``` returns true.
-
-Prolexa should also be able to interpret statements like "every human is not mortal" or "all birds do not fly". This requires the "sentence/3" predicate in ```proloxa_grammer.pl``` be able to query ```?-sentence([(not(mortal(X)):-human(X))],[every, human, is, not, mortal], []).``` and ```?-sentence([(not(fly(X)):-bird(X))],[all, birds, do, not, fly], []).``` This requires understanding what the arguments "N", "M1" and "M2" in the "determiner/6" predicate stands for in the follwing line:
-
+   Notice that s and p stands for single and plural form of a verb or a noun, and X=\>L means L(X) (from Simply Logical Chapter 7.2 and 7.3).
+   
+   ### Objective 2
+   
+   To achieve objective 2, the following queries should be successful when running ```swipl prolexa_grammer.pl```:
+   
 ```
-sentence1(C) --> determiner(N,M1,M2,C),noun(N,M1),verb_phrase(N,M2).
+5 ?- sentence1(A,[all, birds ,do,not,fly],[]). 
+A = [(not(fly(_A)):-bird(_A))] .
+6 ?- sentence1(A,[every, human, is, mortal],[]). 
+A = [(not(mortal(_A)):-human(_A))] .
 ```
-
-Querying ```?-determiner(N,M1,M2,[(happy(donald):-true)],E,[]).```  showed the following:
-
+   
+   To achieve this the following clause was added.
+   
 ```
-N = s,
-M1 = _A=>true,
-M2 = _A=>happy(donald),
-E = [every] ;
-N = p,
-M1 = _A=>true,
-M2 = _A=>happy(donald),
-E = [all].
+sentence1([(not(H):-B)]) --> determiner(N,X=>B,X=>H,[(H:-B)]),noun(N,X=>B),not_verb_phrase(N,X=>H).
 ```
-
-This means that "N" corresponds to the whether the noun is single or plural, "M1" corresponds to the body of the rule and "M2" corresponds to the head of the rule. Therefore,
-
-```
-sentence1(C) --> determiner(N,M1,M2,C),noun(N,M1),verb_phrase(N,M2).
-```
-
-can be rewritten as:
-
-```
-sentence1([(H:-B)]) --> determiner(N,M1=>B,M2=>H,[(H:-B)]),noun(N,M1=>B),verb_phrase(N,M2=>H).
-sentence1([(not(H):-B)]) --> determiner(N,M1=>B,M2=>H,[(H:-B)]),noun(N,M1=>B),not_verb_phrase(N,M2=>H).
-```
-The first line handles queries like ```sentence1([(mortal(X):-human(X))],[every, human, is, mortal],[]).```. The second line handles queries like ```sentence1([(not(mortal(X)):-human(X))],[every, human, is, not, mortal],[]).``` Notice that the arguments in the "deteminer/6" and the "noun/4" predicates are exactly the same. This is because negation is only added to the part of the sentence after "is", which corresponds to the head of the rule. Now prolexa can handle the following utterances.
-
-Finally, we need to add the Modus Tollens reasoning (if A then B. Not B. Therefore not A), which is the generalized case of 
-
-> Every teacher is happy. 
-> Donald is not happy. 
-> Therefore, Donald is not a teacher.
-
-to the "prolexa_engine.pl". This is achieved by adding the following lines to the "prove_rb/4" predicate:
-
+   The 4th argument in ```determiner/6``` usually serves the purpose of defining the rule that the sentences/statements will be converted into (see Simply Logical Chapter 7.3). However, since this responsibility is handled by the first argument in ```sentence1/3``` already, the 4 argument in ```determiner/4``` is trivial. The ```noun/4``` constructs the fact in the body of the rule whilst the ```not_verb_phrase/4``` constructs the fact in the head of the rule. The facts in the head and body should share the same argument X, hence the 2nd arguments in ```noun/4``` and ```not_verb_phrase/4``` are X=\>H and X=\>B respectively.
+   
+   ### Objective 3
+   
+   To achieve Objective 3, I need the meta-interpreter to be able to infer fact (not(teacher(peter))) given that the rule base contains rule [(not(happy(peter)):-true )] and [(happy(X):-teacher(X))]. To generalize, I need the meta-interpreter to be able to handle the following: to prove (not(A)), it needs to find two rules, [(B:-A)] and [(not(B):-true)]. Therefore, I added the following lines to ```prolexa_engine.pl```:
+   
 ```
 prove_rb(not(A),Rulebase,P0,P):-
-    find_clause((B:-A),Rule,Rulebase),
-	prove_rb(not(B),Rulebase,[p(not(A),Rule)|P0],P).
+   find_clause((B:-A),Rule,Rulebase),
+   prove_rb(not(B),Rulebase,[p(not(A),Rule)|P0],P).
 ```
-which means, in order to prove not(A) is true, find a clause that states "if A then B", and prove not(B) is true. And now the program can interpret negation.
+	
+   The 3rd argument is the accumulator. Therefore it needs to add p(not(A),Rule) to P0. This is also known as the Modus Tollens inference rule: if A then B. not B. therefore not A.
+
+### Testing the Prolexa after more clauses have been added
+	
+To test whether Prolexa runs as intended after the clauses are added, the following commands were executed on the commandline (after running ```swipl prolexa.pl```) and expected output messages were returned:
 
 ```
 1 ?- prolexa_cli.
-prolexa> "forget everything you know".
-*** utterance(forget everything you know)
-*** goal(retractall(prolexa:stored_rule(_55582,_55584)))
+prolexa> "forget everything".
+*** utterance(forget everything)
+*** goal(retractall(prolexa:stored_rule(_55846,_55848)))
 *** answer(I am a blank slate)
 I am a blank slate
-
-
-prolexa> "peter is human". 
-*** utterance(peter is human)
-*** rule([(human(peter):-true)])
-*** answer(I will remember that peter is human)
-I will remember that peter is human
-
-
-prolexa> "every human is mortal".
-*** utterance(every human is mortal)
-*** rule([(mortal(_56282):-human(_56282))])
-*** answer(I will remember that every human is mortal)
-I will remember that every human is mortal
-
-
-prolexa> "peter is mortal".
-*** utterance(peter is mortal)
-*** rule([(mortal(peter):-true)])
-*** answer(I already knew that peter is mortal)
-I already knew that peter is mortal
-
-
-prolexa> "explain why peter is mortal".
-*** utterance(explain why peter is mortal)
-*** goal(explain_question(mortal(peter),_57092,_56882))
-*** answer(peter is human; every human is mortal; therefore peter is mortal)
-peter is human; every human is mortal; therefore peter is mortal
-
-
-prolexa> "donald is not happy".
-*** utterance(donald is not happy)
-*** rule([(not(happy(donald)):-true)])
-*** answer(I will remember that donald is not happy)
-I will remember that donald is not happy
-
-
 prolexa> "every teacher is happy".
 *** utterance(every teacher is happy)
-*** rule([(happy(_58310):-teacher(_58310))])
+*** rule([(happy(_56068):-teacher(_56068))])
 *** answer(I will remember that every teacher is happy)
 I will remember that every teacher is happy
-
-
-prolexa> "donald is not a teacher".
-*** utterance(donald is not a teacher)
-*** rule([(not(teacher(donald)):-true)])
-*** answer(I already knew that donald is not a teacher)
-I already knew that donald is not a teacher
-
-
-prolexa> "explain why donald is not a teacher".
-*** utterance(explain why donald is not a teacher)
-*** goal(explain_question(not(teacher(donald)),_59272,_58998))
-*** answer(donald is not happy; every teacher is happy; therefore donald is not a teacher)
-donald is not happy; every teacher is happy; therefore donald is not a teacher
-
-
-prolexa> "tweety does not fly".
-*** utterance(tweety does not fly)
-*** rule([(not(fly(tweety)):-true)])
-*** answer(I will remember that tweety does not fly)
-I will remember that tweety does not fly
-
-
-prolexa> "every bird flies".
-*** utterance(every bird flies)
-*** rule([(fly(_60480):-bird(_60480))])
-*** answer(I will remember that every bird flies)
-I will remember that every bird flies
-prolexa> "explain why tweety is not a bird".
-
-
-*** utterance(explain why tweety is not a bird)
-*** goal(explain_question(not(bird(tweety)),_60924,_60654))
-*** answer(tweety does not fly; every bird flies; therefore tweety is not a bird)
-tweety does not fly; every bird flies; therefore tweety is not a bird
+prolexa> "peter is not happy".
+*** utterance(peter is not happy)
+*** rule([(not(happy(peter)):-true)])
+*** answer(I will remember that peter is not happy)
+I will remember that peter is not happy
+prolexa> "explain why peter is not a teacher".
+*** utterance(explain why peter is not a teacher)
+*** goal(explain_question(not(teacher(peter)),_56800,_56526))
+*** answer(peter is not happy; every teacher is happy; therefore peter is not a teacher)
+peter is not happy; every teacher is happy; therefore peter is not a teacher
 prolexa>
 ```
+	
+## Objectives 4, 5 and 6: Conjunction <a name="conjunction">
+### Objective 4
 
-### Conjunction
-
-The meta interpreter in ```prolexa_engine.pl``` can handle conjunction. However, the grammer for conjunction is not implemented. Therefore, to complete conjunction for prolexa, the following clauses are added:
+To achieve objective 4, the following querying should be sucessful after running ```swipl prolexa_grammer.pl```:
 
 ```
-sentence1([((H1,H2):-B)]) --> determiner(N,M1=>B,M2=>H1,[(H1:-B)]),noun(N,M1=>B),verb_phrase(N,M2=>H1),property_and_list(N,(M2=>H2)).
+1 ?- sentence1(A,[peter,is,happy,and,mortal,and,red],[]). 
+A = [(happy(peter), mortal(peter), red(peter):-true)] .
+```
+
+This is achieved by adding the following clauses to ```prolexa_grammer.pl```:
+
+```
 sentence1([((H1,H2):-true)]) --> proper_noun(N,X),verb_phrase(N,X=>H1),property_and_list(N,(X=>H2)).
 property_and_list(N,X=>M) --> [and],property(N,X=>M).
 property_and_list(N,X=>(M1,M2)) --> [and],property(N,X=>M1), property_and_list(N,X=>M2).
 ```
 
-The ```property_and_list/4``` predicate allows the grammer to handle utterences cpnsisting multiple "and", e.g.,
+Note that H1 corresponds to the first fact in the head, e.g, happy(peter). H2 corresponds to a conjunction list of facts, e.g., mortal(peter), red(peter).
+	
+Also, rule ```property_and_list(N,X=>M)``` uses recursion to parse a sentence that contains multiple conjunction such that the following query is successful:
 
 ```
-?- property_and_list(A,B,[and,human,and,mortal,and,happy,and,red,and,blue],[]). 
-B = _A=>(human(_A), mortal(_A), happy(_A), red(_A), blue(_A)) ;
-false.
+7 ?- property_and_list(A,B,[and,happy,and,mortal,and,green,and,blue,and,red],[]).
+B = _A=>(happy(_A), mortal(_A), green(_A), blue(_A), red(_A)) .
+```
+	
+### Objective 5
+
+To achieve objective 5, the following queries must be successful after running ```swipl prolexa_grammer.pl```:
+
+```
+7 ?- sentence1(A,[every,human,is,happy,and,mortal,and,red],[]).                   
+A = [(happy(_A), mortal(_A), red(_A):-human(_A))] .
 ```
 
-One thing to note is the ```X=>``` in the ```property_and_list/4``` which ensures that the atoms in conjuntion with one another share the same argument such that ```(human(_A), mortal(_A),...)``` all share the same argument (_A).
+This is achieved by adding the following clause to to ```prolexa_grammer.pl```:
+```
+sentence1([((H1,H2):-B)]) --> determiner(N,X=>B,X=>H1,[(H1:-B)]),noun(N,X=>B),verb_phrase(N,X=>H1),property_and_list(N,(X=>H2)).
+```
 
-Now prolexa can deal with utterences like "peter is happy and mortal" and "every human is happy and mortal". It can also handle reasonings like "Peter is human. Every human is happy. Peter is human. Every huamn is mortal. Therefore, Peter is happy and mortal".
+Like Objective 2, ```determiner/6``` is trivial here because the rules is constructed in ```sentence1/3```.
+
+### Objective 6
+	
+To achieve objective 6, the meta-interpreter need to be be able to infer fact (happy(peter),mortal(peter),red(peter)) give that the rulebase contains rules [(happy(X):-human(X))], [(mortal(X):-human(X))], [(red(X):-human(X))] and [(human(peter):-true)]. More generally, this means the meta-interpreter need to be able to infer fact (P, Q, R) given rule [(P:-K)], [(Q:-K)], [(R:-K)] and [(K:-true)]. Fortunately, the original meta-interpreter in Prolexa can already handle this:
+	
+```
+prove_rb(true,_Rulebase,P,P):-!.
+prove_rb((A,B),Rulebase,P0,P):-!,
+    find_clause((A:-C),Rule,Rulebase),
+    conj_append(C,B,D),
+    prove_rb(D,Rulebase,[p((A,B),Rule)|P0],P).
+prove_rb(A,Rulebase,P0,P):-
+    find_clause((A:-B),Rule,Rulebase),
+    prove_rb(B,Rulebase,[p(A,Rule)|P0],P).
+```
+
+The 3rd clause of ```prove_rb/4``` states that to prove fact A, the meta-interpreter needs to find two rules [(A:-B)] and B. This is also known as the Modus Ponens inference rule, i.e., if B then A. B. Therefore A.
+	
+The 2nd clause of ```prove_rb/4``` states that to prove a conjunction list of facts (A,B), where A is the first fact/atom and B is the conjunction sublist of (A,B) without the first fact/atom, start with proving A first, then move on to the first fact/atom in B. This is also known as the conjunction inference rule, i.e., A. B. Therefore A and B.
+
+The 1st clause of ```prove_rb/4``` is the exit condition of the recursive calls in the 2nd and 3rd clauses.
+	
+### Testing the Prolexa after more clauses have been added
+	
+To test whether Prolexa runs as intended after the clauses are added, the following commands were executed on the commandline (after running ```swipl prolexa.pl```) and expected output messages were returned:
 
 ```
+1 ?- prolexa_cli.
 prolexa> "forget everything".
 *** utterance(forget everything)
-*** goal(retractall(prolexa:stored_rule(_56902,_56904)))
+*** goal(retractall(prolexa:stored_rule(_55846,_55848)))
 *** answer(I am a blank slate)
 I am a blank slate
 prolexa> "peter is human".
@@ -224,65 +267,109 @@ prolexa> "peter is human".
 *** rule([(human(peter):-true)])
 *** answer(I will remember that peter is human)
 I will remember that peter is human
-prolexa> "every human is happy".
-*** utterance(every human is happy)
-*** rule([(happy(_57380):-human(_57380))])
-*** answer(I will remember that every human is happy)
-I will remember that every human is happy
 prolexa> "every human is mortal".
 *** utterance(every human is mortal)
-*** rule([(mortal(_57746):-human(_57746))])
+*** rule([(mortal(_56324):-human(_56324))])
 *** answer(I will remember that every human is mortal)
 I will remember that every human is mortal
-prolexa> "explain why peter is happy and mortal".
-*** utterance(explain why peter is happy and mortal)
-*** goal(explain_question((happy(peter),mortal(peter)),_58214,_57944))
-*** answer(peter is human; every human is mortal; peter is human; every human is happy; therefore peter is happy and mortal)
-peter is human; every human is mortal; peter is human; every human is happy; therefore peter is happy and mortal
+prolexa> "every human is happy".
+*** utterance(every human is happy)
+*** rule([(happy(_56702):-human(_56702))])
+*** answer(I will remember that every human is happy)
+I will remember that every human is happy
+prolexa> "every human is red".
+*** utterance(every human is red)
+*** rule([(red(_57068):-human(_57068))])
+*** answer(I will remember that every human is red)
+I will remember that every human is red
+prolexa> "explain why peter is mortal and happy and red".
+*** utterance(explain why peter is mortal and happy and red)
+*** goal(explain_question((mortal(peter),happy(peter),red(peter)),_57586,_57256))
+*** answer(peter is human; every human is red; peter is human; every human is happy; peter is human; every human is mortal; therefore peter is mortal and happy and red)
+peter is human; every human is red; peter is human; every human is happy; peter is human; every human is mortal; therefore peter is mortal and happy and red
 prolexa>
 ```
 
-### Disjunction
-#### Grammer
-The added grammer for disjunction is very similar to that of conjunction, except the ```property_or_list/4``` handles utterences that contain "or" rather than "and".
+## Objectives 7, 8 and 9: Disjunction <a name="disjunction"> 
+
+### Objective 7
+To achieve objective 7, the following query should be successful after running ```swipl prolexa_grammer.pl```:
+
+```
+1 ?- sentence1(A,[peter,is, happy,or,mortal,or,red,or,blue,or,green],[]). 
+A = [(happy(peter);mortal(peter);red(peter);blue(peter);green(peter):-true)] .
+```
+
+This is achieved by adding the following clauses to ```prolexa_grammer.pl```:
 
 ```
 sentence1([((H1;H2):-true)]) --> proper_noun(N,X),verb_phrase(N,X=>H1),property_or_list(N,(X=>H2)).
-sentence1([((H1;H2):-B)]) --> determiner(N,M1=>B,M2=>H1,[(H1:-B)]),noun(N,M1=>B),verb_phrase(N,M2=>H1),property_or_list(N,(M2=>H2)).
 property_or_list(N,X=>M) --> [or],property(N,X=>M).
 property_or_list(N,X=>(M1;M2)) --> [or],property(N,X=>M1), property_or_list(N,X=>M2).
 ```
 
-#### Meta Interpreter
+Note that rule ```property_or_list/4``` is very similar to ```property_and_list``` described in Objective 4. The only difference is that ```property_or_list/4``` converts sentences with multiple disjunctions into a disjunction list (separated by semicolons) rather than a conjunction list (separated by commas). For comparison see below:
+	
+```
+5 ?- property_and_list(A,B,[and,happy,and,mortal,and,green,and,blue,and,red],[]).  
+B = _A=>(happy(_A), mortal(_A), green(_A), blue(_A), red(_A)) .
 
-The goal is to add clauses to the meta interpreter such that it can handle cases like "every human is happy or mortal. peter is human. peter is not mortal. therefore peter is happy". This means the meta interpreter needs to handle the following reasoning pattern: "if p then q or r. p. not r. therefore q", or "if p then q or r. p. not q. therefore r". This can be also written as "if p then q or r. p and not r. therefore q", or "if p then q or r. p and not q. therefore r". The corresponding added clauses to the meta interpreter therefore is the following:
+6 ?- property_or_list(A,B,[or,happy,or,mortal,or,green,or,blue,or,red],[]).       
+B = _A=>(happy(_A);mortal(_A);green(_A);blue(_A);red(_A)) .
+```
+	
+Objective 8:
 
+To achieve objective 8, the following queries must be successful after running ```swipl prolexa_grammer.pl```:
+
+```
+7 ?- sentence1(A,[every,human,is, happy,or,mortal,or,red,or,blue,or,green],[]).    
+A = [(happy(_A);mortal(_A);red(_A);blue(_A);green(_A):-human(_A))] .
+```
+
+This is achieved by adding the following clause to to ```prolexa_grammer.pl```:
+```
+sentence1([((H1;H2):-B)]) --> determiner(N,X=>B,X=>H1,[(H1:-B)]),noun(N,X=>B),verb_phrase(N,X=>H1),property_or_list(N,(X=>H2)).
+```
+
+Like objective 2 and 5, ```determiner/6``` is trivial here because the rules is constructed in ```sentence1/3```.
+
+Objective 9:
+
+To achieve objective 9, the meta-interpreter need to be be able to infer fact (mortal(peter)) give that the rulebase contains rules [(happy(X);mortal(X):-human(X))], [(not(happy(peter)):-true)], and [(human(peter):-true)]. More generally, this means the meta-interpreter need to be able to infer fact (A) given rule [(A;B:-C)] or [(B;A:-C)], [(C:-true)] and [(not(B):-true)]. Therefore, the following clauses are added to the meta-interpreter:
+	
 ```
 prove_rb(A,Rulebase,P0,P):-
     (find_clause((A;B:-C),Rule,Rulebase);
-	find_clause((B;A:-C),Rule,Rulebase)),
-	prove_rb((C,not(B)),Rulebase,[p(A,Rule)|P0],P).
+    find_clause((B;A:-C),Rule,Rulebase)),
+    prove_rb((C,not(B)),Rulebase,[p(A,Rule)|P0],P).
 ```
 
-Now prolexa can handle utterences like the following:
+where the last line attempts to find rule [(C:-true)] and [(not(B):-true)].
+
+What I have added to the meta-interpreter is very similar to the definition of inference rule Disjunctive syllogism, i.e., A or B. not B. Therefore A. However, it cannot currently handle the more general case, that is, given a set of disjunctive facts $S$, given a subset $A \subset S$ such that all facts in $A$ are not true, therefore it can be infered that all facts in set $S - A$ are true. For example, "peter is human", "every human is happy or mortal or red or blue or green", "peter is not mortal or blue", therefore "peter is happy or red or green".
+
+### Testing the Prolexa after more clauses have been added
+
+To test whether Prolexa runs as intended after the clauses are added, the following commands were executed on the commandline (after running ```swipl prolexa.pl```) and expected output messages were returned:
 
 ```
-?- prolexa_cli.                   
-prolexa> "tell me everything you know".
-*** utterance(tell me everything you know)
-*** goal(all_rules(_58748))
-*** answer(peter is human. every human is happy or mortal. peter is not mortal)
-peter is human. every human is happy or mortal. peter is not mortal
-prolexa> "explain why peter is happy". 
-*** utterance(explain why peter is happy)
-*** goal(explain_question(happy(peter),_59842,_59632))
-*** answer(peter is not mortal; peter is human; every human is happy or mortal; therefore peter is happy)
-peter is not mortal; peter is human; every human is happy or mortal; therefore peter is happy
-prolexa> "forget peter is not mortal".
-*** utterance(forget peter is not mortal)
-*** goal(retractall(prolexa:stored_rule(_61074,[(not(mortal(peter)):-true)])))
-*** answer(I erased it from my memory)
-I erased it from my memory
+1 ?- prolexa_cli.
+prolexa> "forget everything".
+*** utterance(forget everything)
+*** goal(retractall(prolexa:stored_rule(_57286,_57288)))
+*** answer(I am a blank slate)
+I am a blank slate
+prolexa> "peter is human". 
+*** utterance(peter is human)
+*** rule([(human(peter):-true)])
+*** answer(I will remember that peter is human)
+I will remember that peter is human
+prolexa> "every human is mortal or happy".
+*** utterance(every human is mortal or happy)
+*** rule([(mortal(_57832);happy(_57832):-human(_57832))])
+*** answer(I will remember that every human is mortal or happy)
+I will remember that every human is mortal or happy
 prolexa> "peter is not happy".
 *** utterance(peter is not happy)
 *** rule([(not(happy(peter)):-true)])
@@ -290,8 +377,33 @@ prolexa> "peter is not happy".
 I will remember that peter is not happy
 prolexa> "explain why peter is mortal".
 *** utterance(explain why peter is mortal)
-*** goal(explain_question(mortal(peter),_61694,_61484))
+*** goal(explain_question(mortal(peter),_58580,_58370))
+*** answer(peter is not happy; peter is human; every human is mortal or happy; therefore peter is mortal)
+peter is not happy; peter is human; every human is mortal or happy; therefore peter is mortal
+prolexa> "forget every human is mortal or happy".
+*** utterance(forget every human is mortal or happy)
+*** goal(retractall(prolexa:stored_rule(_59886,[(mortal(_59928);happy(_59928):-human(_59928))])))
+*** answer(I erased it from my memory)
+I erased it from my memory
+prolexa> "tell me everything".
+*** utterance(tell me everything)
+*** goal(all_rules(_60156))
+*** answer(peter is human. peter is not happy)
+peter is human. peter is not happy
+prolexa> "every human is happy or mortal" .
+*** utterance(every human is happy or mortal)
+*** rule([(happy(_60908);mortal(_60908):-human(_60908))])
+*** answer(I will remember that every human is happy or mortal)
+I will remember that every human is happy or mortal
+prolexa> "explain why peter is mortal".
+*** utterance(explain why peter is mortal)
+*** goal(explain_question(mortal(peter),_61372,_61162))
 *** answer(peter is not happy; peter is human; every human is happy or mortal; therefore peter is mortal)
 peter is not happy; peter is human; every human is happy or mortal; therefore peter is mortal
 prolexa>
 ```
+
+# <a name="limitations">Conclusion #
+In conclusion, Objectives 1-9 have all been successfully achieved.
+
+However, there is one limitation with objective 9. What I have added to the meta-interpreter to complete objective 9 is very similar to the definition of inference rule Disjunctive syllogism, i.e., A or B. not B. Therefore A. However, it cannot currently handle the more general case, that is, given a set of disjunctive facts S, given a subset A of S such that all facts in A are not true, Prolexa cannot infer that all facts in set S - A are true. For example, given "peter is human", "every human is happy or mortal or red or blue or green", "peter is not mortal or blue", Prolexa cannot infer "peter is happy or red or green".

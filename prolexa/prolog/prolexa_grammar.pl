@@ -64,13 +64,13 @@ sword --> [that].
 
 % most of this follows Simply Logical, Chapter 7
 %sentence1(C) --> determiner(N,M1,M2,C),noun(N,M1),verb_phrase(N,M2).
-sentence1([((H1;H2):-B)]) --> determiner(N,M1=>B,M2=>H1,[(H1:-B)]),noun(N,M1=>B),verb_phrase(N,M2=>H1),property_or_list(N,(M2=>H2)).
-sentence1([((H1,H2):-B)]) --> determiner(N,M1=>B,M2=>H1,[(H1:-B)]),noun(N,M1=>B),verb_phrase(N,M2=>H1),property_and_list(N,(M2=>H2)).
+sentence1([((H1;H2):-B)]) --> determiner(N,X=>B,X=>H1,[(H1:-B)]),noun(N,X=>B),verb_phrase(N,X=>H1),property_or_list(N,(X=>H2)).
+sentence1([((H1,H2):-B)]) --> determiner(N,X=>B,X=>H1,[(H1:-B)]),noun(N,X=>B),verb_phrase(N,X=>H1),property_and_list(N,(X=>H2)).
 %need to figure out a way to write a recurision for determiner
 
-sentence1([(H:-B)]) --> determiner(N,M1=>B,M2=>H,[(H:-B)]),noun(N,M1=>B),verb_phrase(N,M2=>H).
+sentence1([(H:-B)]) --> determiner(N,X=>B,X=>H,[(H:-B)]),noun(N,X=>B),verb_phrase(N,X=>H).
 
-sentence1([(not(H):-B)]) --> determiner(N,M1=>B,M2=>H,[(H:-B)]),noun(N,M1=>B),not_verb_phrase(N,M2=>H).
+sentence1([(not(H):-B)]) --> determiner(N,X=>B,X=>H,[(H:-B)]),noun(N,X=>B),not_verb_phrase(N,X=>H).
 
 sentence1([(L:-true)]) --> proper_noun(N,X),verb_phrase(N,X=>L).
 
